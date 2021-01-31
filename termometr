@@ -1,0 +1,80 @@
+#include <DallasTemperature.h>
+#include <OneWire.h>
+#include <ArduinoJson.h>
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <base64.h>
+
+String login = "HESUserOne";
+String authPass = "HESUserOne";
+String auth = base64::encode(login + ":" + authPass);
+const char* ssid = "UrFU-Guest"; //имя точки
+const char* password = ""; //пароль
+const int oneWireBus = 14; // GPIO куда подключен DS18B20
+OneWire oneWire(oneWireBus); // Объявление OneWire для связи с устройствами
+DallasTemperature sensors(&oneWire); // Пробрасываем OneWire к датчику
+String conn = "http://188.226.32.141/records";
+String con2 = "http://18.216.254.223/records";
+void setup() {
+Serial.begin(115200); //запускаем монитор порта
+sensors.begin(); //запускаем датчик
+delay(4000);
+WiFi.begin(ssid, password);
+
+while (WiFi.status() != WL_CONNECTED) {
+delay(1000);
+Serial.println("Connecting to WiFi..");
+}
+
+Serial.println("Connected to the WiFi network");
+
+}
+
+void loop() {
+HTTPClient http;
+HTTPClient http2;
+String a = "";
+// put your main code here, to run repeatedly:
+sensors.requestTemperatures(); //обновляем температуру
+float temperatureC = sensors.getTempCByIndex(0); //запрашиваем и пишем в переменную
+Serial.print("Температура: ");
+Serial.println(temperatureC); //выводим в консоль
+DynamicJsonDocument doc(128);
+
+doc["latitude"] = 56.842135;
+doc["longitude"] = 60.651898;
+
+JsonObject values = doc.createNestedObject("values");
+values["temperature"] = temperatureC;
+values["pressure"] = 0;
+values["humidity"] = 0;
+doc["deviceName"] = "NMTM_102701";
+doc["dateTime"] = "";
+serializeJson(doc, a);
+http.begin(conn);
+http.addHeader("Content-Type", "application/json");
+http.addHeader("Authorization: Basic " , auth);
+int httpCode = http.POST(a);
+String payload = http.getString(); //Get the response payload
+Serial.println(httpCode); //Print HTTP return code
+Serial.println(payload); //Print request response payload
+//Ждем 2 сек.
+delay (2000);
+//потом отключаемся
+http.end();
+delay(5000);
+http2.begin(con2);
+http2.addHeader("Content-Type", "application/json");
+http2.addHeader("Authorization: Basic " , auth);
+httpCode = http2.POST(a);
+payload = http2.getString(); //Get the response payload
+Serial.println(httpCode); //Print HTTP return code
+Serial.println(payload); //Print request response payload
+//Ждем 2 сек.
+delay (2000);
+//потом отключаемся
+http2.end();
+delay(5000);
+delay(598000); //задержка в 598 секунд
+
+}
